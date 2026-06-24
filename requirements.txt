@@ -10,3 +10,6 @@ langchain-text-splitters
 torch
 torchvision
 langchain-chroma
+gtts
+faster-whisper
+streamlit-mic-recorder

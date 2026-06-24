@@ -4,6 +4,9 @@ import streamlit as st
 from ingest import ingest_resume
 from rag import generate_question
 from evaluator import evaluate_answer
+from tts import text_to_speech
+from streamlit_mic_recorder import mic_recorder
+from stt import speech_to_text
 
 st.set_page_config(
     page_title="AI Interview Coach",
@@ -27,6 +30,8 @@ if "answers" not in st.session_state:
 
 if "feedbacks" not in st.session_state:
     st.session_state.feedbacks = []
+if "voice_answer" not in st.session_state:
+    st.session_state.voice_answer = ""
 
 # -------------------------
 # Resume Upload
@@ -128,10 +133,51 @@ if st.session_state.question_count > 0:
         st.session_state.question
     )
 
+    audio_file = text_to_speech(
+        st.session_state.question
+    )
+
+    st.audio(audio_file)
+
+    audio = mic_recorder(
+        start_prompt="🎤 Start Recording",
+        stop_prompt="⏹ Stop Recording",
+        key="recorder"
+    )
+
+    if audio:
+
+        with open(
+            "answer.webm",
+            "wb"
+        ) as f:
+
+            f.write(
+                audio["bytes"]
+            )
+
+        try:
+
+            text = speech_to_text(
+                "answer.webm"
+            )
+
+            st.session_state.voice_answer = text
+
+            st.success(
+                "Voice converted to text!"
+            )
+
+        except Exception as e:
+
+            st.error(
+                f"Transcription Error: {e}"
+            )
+
     answer = st.text_area(
         "Your Answer",
-        height=200,
-        key=f"answer_{st.session_state.question_count}"
+        value=st.session_state.voice_answer,
+        height=200
     )
 
     if st.button("Evaluate Answer"):
@@ -172,6 +218,8 @@ if st.session_state.question_count > 0:
     if st.button("Next Question"):
 
         st.session_state.question_count += 1
+
+        st.session_state.voice_answer = ""
 
         if st.session_state.question_count <= 5:
 
