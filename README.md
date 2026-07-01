@@ -1,115 +1,459 @@
 # 🤖 AI Interview Coach
 
-An AI-powered Interview Preparation Platform that simulates personalized technical interviews using Retrieval-Augmented Generation (RAG), Large Language Models (LLMs), and Resume-Aware Question Generation.
 
-The system analyzes a candidate's resume, aligns interview questions with a target job description, conducts a multi-round mock interview, evaluates responses, and generates a detailed AI-powered interview report.
 
-## 🚀 Features
+An AI-powered interview preparation platform that leverages **Retrieval-Augmented Generation (RAG)**, **Large Language Models (LLMs)**, and **semantic search** to conduct personalized technical interviews based on a candidate's resume and target job description.
 
-### 📄 Resume-Aware Interview Generation
 
-* Upload a resume in PDF format
-* Extracts and processes resume content automatically
-* Creates a searchable knowledge base using vector embeddings
 
-### 🔍 RAG-Based Question Generation
+The platform generates context-aware interview questions, supports multi-round mock interviews, evaluates candidate responses, provides AI-generated interview feedback, and includes voice-enabled interaction through Speech-to-Text and Text-to-Speech.
 
-* Uses ChromaDB as a vector database
-* Retrieves relevant resume context through semantic search
-* Generates personalized interview questions based on candidate background
+
+
+---
+
+
+
+# 🚀 Features
+
+
+
+### 📄 Resume Knowledge Base
+
+
+
+* Upload resumes in PDF format
+
+* Automatically extract and process resume content
+
+* Build a semantic knowledge base using ChromaDB
+
+
 
 ### 🎯 Job Description Matching
 
-* Accepts a target Job Description
-* Aligns interview questions with company requirements
-* Produces role-specific and skill-focused questions
 
-### 🧠 Multi-Round Interview Simulation
 
-* Conducts a complete 5-question mock interview
-* Tracks interview progress in real time
-* Supports multiple interview domains:
+* Paste a target Job Description
+
+* Align interview questions with company requirements
+
+* Generate role-specific interview questions
+
+
+
+### 🧠 Personalized Question Generation
+
+
+
+* Uses Retrieval-Augmented Generation (RAG)
+
+* Retrieves relevant resume context using semantic search
+
+* Generates interview questions tailored to:
+
+
 
   * Projects
+
   * Skills
+
   * Education
+
   * Experience
 
-### 📊 AI-Powered Answer Evaluation
+
+
+### 🎙️ Voice-Enabled Interview
+
+
+
+* AI interviewer reads questions using Text-to-Speech (gTTS)
+
+* Candidate answers through voice
+
+* Speech converted to text using Faster-Whisper
+
+* Supports both voice and text-based interviews
+
+
+
+### 💬 AI Answer Evaluation
+
+
 
 * Evaluates candidate responses using Groq-hosted LLMs
-* Provides technical feedback and performance assessment
-* Simulates interviewer-style evaluation
 
-### 📑 Final Interview Report
+* Provides interviewer-style feedback
 
-* Generates a comprehensive interview summary
-* Highlights strengths and areas for improvement
-* Provides actionable recommendations for preparation
+* Simulates a technical interview experience
+
+
+
+### 📑 Multi-Round Interview
+
+
+
+* Conducts a complete mock interview session
+
+* Supports multiple interview rounds
+
+* Tracks candidate responses throughout the interview
+
+
+
+### 📊 AI Interview Report
+
+
+
+* Generates a final interview summary
+
+* Highlights strengths and improvement areas
+
+* Provides actionable feedback for future preparation
+
+
+
+### 🤖 Modular AI Agent Design
+
+
+
+* Question Generation Agent
+
+* Answer Evaluation Agent
+
+* Interview Report Agent
+
+
+
+The project includes modular LangGraph-compatible agent components to separate interview generation, evaluation, and reporting into independent AI workflows.
+
+
 
 ---
 
-## 🏗️ Tech Stack
+
+
+# 🏗️ Tech Stack
+
+
 
 ### Frontend
 
+
+
 * Streamlit
+
+
 
 ### Backend
 
+
+
 * Python
+
+
 
 ### LLM
 
+
+
 * Groq (Llama 3.3 70B)
+
+
 
 ### RAG Framework
 
+
+
 * LangChain
 
-### Embedding Model
 
-* BAAI/bge-small-en-v1.5
+
+### Agent Framework
+
+
+
+* LangGraph
+
+
 
 ### Vector Database
 
+
+
 * ChromaDB
+
+
+
+### Embedding Model
+
+
+
+* BAAI/bge-small-en-v1.5
+
+
+
+### Speech Processing
+
+
+
+* Faster-Whisper (Speech-to-Text)
+
+* gTTS (Text-to-Speech)
+
+
 
 ### Document Processing
 
+
+
 * PyPDFLoader
+
 * RecursiveCharacterTextSplitter
+
+
 
 ### Environment Management
 
+
+
 * Python Dotenv
 
+
+
 ---
 
-## 🔄 System Workflow
+
+
+# 📂 Project Structure
+
+
+
+```text
+
+AI_INTERVIEW_COACH/
+
+│
+
+├── agents/
+
+│   ├── question_agent.py
+
+│   ├── evaluation_agent.py
+
+│   ├── report_agent.py
+
+│
+
+├── app.py
+
+├── graph.py
+
+├── ingest.py
+
+├── rag.py
+
+├── evaluator.py
+
+├── report.py
+
+├── stt.py
+
+├── tts.py
+
+├── chroma_db/
+
+├── data/
+
+└── requirements.txt
+
+```
+
+
+
+---
+
+
+
+# 🔄 System Workflow
+
+
+
+```text
 
 Resume Upload
-→ PDF Processing
-→ Chunking
-→ Embedding Generation
-→ ChromaDB Vector Storage
-→ Semantic Retrieval
-→ Job Description Matching
-→ Personalized Interview Question Generation
-→ Candidate Response Evaluation
-→ Multi-Round Interview Session
-→ Final AI Interview Report
+
+        │
+
+        ▼
+
+Resume Processing
+
+        │
+
+        ▼
+
+Chunking & Embedding Generation
+
+        │
+
+        ▼
+
+ChromaDB Vector Store
+
+        │
+
+        ▼
+
+Semantic Retrieval (RAG)
+
+        │
+
+        ▼
+
+Job Description Matching
+
+        │
+
+        ▼
+
+Interview Question Generation
+
+        │
+
+        ▼
+
+Text-to-Speech (AI Interviewer)
+
+        │
+
+        ▼
+
+Candidate Voice/Text Response
+
+        │
+
+        ▼
+
+Speech-to-Text (Whisper)
+
+        │
+
+        ▼
+
+AI Answer Evaluation
+
+        │
+
+        ▼
+
+Interview Feedback
+
+        │
+
+        ▼
+
+Final Interview Report
+
+```
+
+
 
 ---
 
-## 🎯 Project Highlights
+
+
+# 🤖 AI Agent Workflow
+
+
+
+```text
+
+                Resume + Job Description
+
+                           │
+
+                           ▼
+
+                Question Generation Agent
+
+                           │
+
+                           ▼
+
+                  Evaluation Agent
+
+                           │
+
+                           ▼
+
+                 Interview Report Agent
+
+```
+
+
+
+---
+
+
+
+# ✨ Highlights
+
+
+
+* Resume-Aware Interview Generation
+
+* Job Description Matching
 
 * Retrieval-Augmented Generation (RAG)
-* Resume-Based Question Generation
-* Job Description Alignment
-* Semantic Search with ChromaDB
-* LLM-Powered Interview Evaluation
-* Multi-Step Interview Simulation
-* AI-Generated Performance Reports
 
-This project demonstrates practical applications of Generative AI, RAG pipelines, vector databases, semantic retrieval, and LLM-powered evaluation systems in the recruitment and interview preparation domain.
+* Semantic Search using ChromaDB
+
+* Multi-Round Mock Interview
+
+* AI-Based Answer Evaluation
+
+* Voice Interview Support
+
+* Speech-to-Text & Text-to-Speech
+
+* Modular LangGraph Agent Design
+
+* Personalized Interview Reporting
+
+
+
+---
+
+
+
+# 🛠️ Installation
+
+
+
+```bash
+
+git clone <repository-url>
+
+
+
+cd AI_INTERVIEW_COACH
+
+
+
+pip install -r requirements.txt
+
+
+
+streamlit run app.py
+
+```
+
+
+
+
+
+
+
+
