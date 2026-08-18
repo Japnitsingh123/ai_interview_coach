@@ -10,6 +10,9 @@ langchain-text-splitters
 torch
 torchvision
 langchain-chroma
+langchain-groq
+langgraph
+python-dotenv
 gtts
 faster-whisper
 streamlit-mic-recorder

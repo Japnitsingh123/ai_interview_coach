@@ -2,8 +2,7 @@ import os
 import streamlit as st
 
 from ingest import ingest_resume
-from rag import generate_question
-from evaluator import evaluate_answer
+from graph import run_question, run_evaluation, run_final_report
 from tts import text_to_speech
 from streamlit_mic_recorder import mic_recorder
 from stt import speech_to_text
@@ -14,6 +13,7 @@ st.set_page_config(
 )
 
 st.title("🤖 AI Interview Coach")
+st.caption("Powered by Agentic AI — LangGraph Pipeline")
 
 # -------------------------
 # Session State
@@ -30,8 +30,21 @@ if "answers" not in st.session_state:
 
 if "feedbacks" not in st.session_state:
     st.session_state.feedbacks = []
+
+if "reports" not in st.session_state:
+    st.session_state.reports = []
+
+if "history" not in st.session_state:
+    st.session_state.history = []
+
 if "voice_answer" not in st.session_state:
     st.session_state.voice_answer = ""
+
+if "topic" not in st.session_state:
+    st.session_state.topic = "Projects"
+
+if "job_description" not in st.session_state:
+    st.session_state.job_description = ""
 
 # -------------------------
 # Resume Upload
@@ -56,6 +69,10 @@ topic = st.selectbox(
         "Experience"
     ]
 )
+
+# Persist topic and JD in session state
+st.session_state.topic = topic
+st.session_state.job_description = job_description
 
 if uploaded_file:
 
@@ -98,13 +115,21 @@ if st.button("Start Interview"):
 
     st.session_state.feedbacks = []
 
-    st.session_state.question = generate_question(
-        topic,
-        job_description
-    )
+    st.session_state.reports = []
+
+    st.session_state.history = []
+
+    with st.spinner("🤖 Agent is generating your first question..."):
+
+        st.session_state.question = run_question(
+            st.session_state.topic,
+            st.session_state.job_description,
+            question_number=1,
+            history=[]
+        )
 
 # -------------------------
-# Interview Complete
+# Interview Complete — Final Report
 # -------------------------
 
 if st.session_state.question_count > 5:
@@ -114,6 +139,21 @@ if st.session_state.question_count > 5:
     st.write(
         f"Questions Attempted: {len(st.session_state.answers)}"
     )
+
+    # Generate final comprehensive report via the agentic graph
+    if "final_report" not in st.session_state:
+
+        with st.spinner(
+            "🤖 Report Agent is generating your comprehensive final report..."
+        ):
+
+            st.session_state.final_report = run_final_report(
+                st.session_state.history
+            )
+
+    st.subheader("📊 Comprehensive Interview Report")
+
+    st.markdown(st.session_state.final_report)
 
     st.stop()
 
@@ -191,13 +231,19 @@ if st.session_state.question_count > 0:
         else:
 
             with st.spinner(
-                "Evaluating..."
+                "🤖 Evaluation & Report Agents are analyzing your answer..."
             ):
 
-                feedback = evaluate_answer(
+                result = run_evaluation(
                     st.session_state.question,
-                    answer
+                    answer,
+                    st.session_state.topic,
+                    st.session_state.job_description,
+                    history=st.session_state.history
                 )
+
+            feedback = result["feedback"]
+            report = result["report"]
 
             st.session_state.answers.append(
                 answer
@@ -207,12 +253,31 @@ if st.session_state.question_count > 0:
                 feedback
             )
 
-            st.subheader(
-                "Interview Feedback"
+            st.session_state.reports.append(
+                report
             )
 
-            st.write(
+            # Track Q&A history for the graph agents
+            st.session_state.history.append({
+                "question": st.session_state.question,
+                "answer": answer,
+                "feedback": feedback
+            })
+
+            st.subheader(
+                "📝 Evaluation Feedback"
+            )
+
+            st.markdown(
                 feedback
+            )
+
+            st.subheader(
+                "📋 Question Report"
+            )
+
+            st.markdown(
+                report
             )
 
     if st.button("Next Question"):
@@ -223,9 +288,15 @@ if st.session_state.question_count > 0:
 
         if st.session_state.question_count <= 5:
 
-            st.session_state.question = generate_question(
-                topic,
-                job_description
-            )
+            with st.spinner(
+                "🤖 Question Agent is generating your next question..."
+            ):
+
+                st.session_state.question = run_question(
+                    st.session_state.topic,
+                    st.session_state.job_description,
+                    question_number=st.session_state.question_count,
+                    history=st.session_state.history
+                )
 
         st.rerun()
