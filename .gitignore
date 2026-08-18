@@ -1,2 +1,9 @@
 .env
 env/
+venv/
+__pycache__/
+*.pyc
+*.webm
+*.mp3
+data/
+chroma_db/
