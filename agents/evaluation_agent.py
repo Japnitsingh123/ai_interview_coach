@@ -1,5 +1,5 @@
 import os
-
+import streamlit as st
 from dotenv import load_dotenv
 from agents.utils import strip_thinking
 
@@ -7,22 +7,23 @@ from langchain_groq import ChatGroq
 
 load_dotenv()
 
+# Support both .env and Streamlit secrets
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY and hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
+MODEL_NAME = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 llm = ChatGroq(
     groq_api_key=GROQ_API_KEY,
-    model_name="qwen/qwen3.6-27b",
+    model_name=MODEL_NAME,
     temperature=0
 )
 
 
 def evaluation_agent(state):
-
     question = state["question"]
-
     answer = state["answer"]
-
     resume_context = state.get("resume_context", "")
 
     prompt = f"""

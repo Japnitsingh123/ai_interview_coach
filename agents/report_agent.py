@@ -1,5 +1,5 @@
 import os
-
+import streamlit as st
 from dotenv import load_dotenv
 from agents.utils import strip_thinking
 
@@ -7,18 +7,21 @@ from langchain_groq import ChatGroq
 
 load_dotenv()
 
+# Support both .env and Streamlit secrets
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY and hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
+MODEL_NAME = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 llm = ChatGroq(
     groq_api_key=GROQ_API_KEY,
-    model_name="qwen/qwen3.6-27b",
+    model_name=MODEL_NAME,
     temperature=0
 )
 
 
 def report_agent(state):
-
     mode = state.get("mode", "evaluate")
 
     # Final report mode — generate cumulative report across all questions
@@ -30,11 +33,8 @@ def report_agent(state):
 
 
 def _generate_question_report(state):
-
     question = state["question"]
-
     answer = state["answer"]
-
     feedback = state["feedback"]
 
     prompt = f"""
@@ -69,7 +69,6 @@ Keep it concise and encouraging.
 
 
 def _generate_final_report(state):
-
     history = state.get("history", [])
 
     if not history:

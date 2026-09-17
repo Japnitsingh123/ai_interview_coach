@@ -1,2 +1,29 @@
+# Environment and API keys
 .env
+.env.*
+!.env.example
 env/
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Chroma vector database & local data
+chroma_db/
+data/resumes/*
+!data/resumes/.gitkeep
+
+# Temporary audio files generated during interview
+*.mp3
+*.webm
+*.wav
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,5 +1,5 @@
 import os
-
+import streamlit as st
 from dotenv import load_dotenv
 from agents.utils import strip_thinking
 
@@ -10,15 +10,18 @@ from langchain_core.prompts import PromptTemplate
 
 load_dotenv()
 
+# Support both .env and Streamlit secrets
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY and hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
+MODEL_NAME = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 llm = ChatGroq(
     groq_api_key=GROQ_API_KEY,
-    model_name="qwen/qwen3.6-27b",
+    model_name=MODEL_NAME,
     temperature=0.7
 )
-
 
 embeddings = HuggingFaceEmbeddings(
     model_name="BAAI/bge-small-en-v1.5"
@@ -32,7 +35,6 @@ vectorstore = Chroma(
 retriever = vectorstore.as_retriever(
     search_kwargs={"k": 3}
 )
-
 
 prompt = PromptTemplate(
     input_variables=[
@@ -74,13 +76,9 @@ Only return the interview question.
 
 
 def question_agent(state):
-
     topic = state["topic"]
-
     job_description = state["job_description"]
-
     question_number = state.get("question_number", 1)
-
     history = state.get("history", [])
 
     # Build previous questions list for the prompt
@@ -91,11 +89,13 @@ def question_agent(state):
     else:
         previous_questions = "None (this is the first question)"
 
-    docs = retriever.invoke(topic)
-
-    context = "\n\n".join(
-        [doc.page_content for doc in docs]
-    )
+    try:
+        docs = retriever.invoke(topic)
+        context = "\n\n".join(
+            [doc.page_content for doc in docs]
+        ) if docs else "No specific resume context found."
+    except Exception:
+        context = "Resume context not available."
 
     final_prompt = prompt.format(
         topic=topic,
