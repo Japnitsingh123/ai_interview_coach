@@ -16,7 +16,8 @@ def evaluate_answer(question, answer):
     llm = ChatGroq(
         groq_api_key=GROQ_API_KEY,
         model_name=get_model_name(),
-        temperature=0
+        temperature=0,
+        max_tokens=500
     )
 
     prompt = f"""

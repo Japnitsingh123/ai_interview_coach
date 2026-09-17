@@ -14,10 +14,12 @@ if not GROQ_API_KEY and hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
 
 MODEL_NAME = get_model_name()
 
+# Setting max_tokens=800 stays safely within Groq's rate limits
 llm = ChatGroq(
     groq_api_key=GROQ_API_KEY,
     model_name=MODEL_NAME,
-    temperature=0
+    temperature=0,
+    max_tokens=800
 )
 
 

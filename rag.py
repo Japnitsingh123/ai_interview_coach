@@ -41,7 +41,8 @@ def generate_question(topic, job_description):
     llm = ChatGroq(
         groq_api_key=GROQ_API_KEY,
         model_name=get_model_name(),
-        temperature=0.7
+        temperature=0.7,
+        max_tokens=300
     )
 
     prompt = PromptTemplate(
