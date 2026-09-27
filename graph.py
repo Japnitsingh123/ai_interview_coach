@@ -1,4 +1,5 @@
-from typing import TypedDict, List, Optional
+from typing import TypedDict, List, Optional, AsyncGenerator, Dict, Any
+import os
 
 from langgraph.graph import StateGraph, END
 
@@ -24,7 +25,7 @@ class InterviewState(TypedDict):
 # Routing Logic
 # -------------------------
 
-def route_by_mode(state):
+def route_by_mode(state: InterviewState):
     """Route to the correct starting node based on mode."""
     mode = state.get("mode", "ask")
     if mode == "ask":
@@ -64,16 +65,15 @@ graph = builder.compile()
 
 
 # -------------------------
-# Helper Functions for app.py
+# Helper Functions with LangSmith Tracing & Metadata
 # -------------------------
 
-def run_question(topic, job_description, question_number=1, history=None):
+def run_question(topic: str, job_description: str, question_number: int = 1, history: Optional[List[dict]] = None) -> str:
     """
     Run the graph in 'ask' mode to generate a new interview question.
-
-    Returns the generated question string.
+    Traced via LangSmith with enriched tags and metadata.
     """
-    state = {
+    state: InterviewState = {
         "mode": "ask",
         "topic": topic,
         "job_description": job_description,
@@ -86,19 +86,27 @@ def run_question(topic, job_description, question_number=1, history=None):
         "report": ""
     }
 
-    result = graph.invoke(state)
+    config = {
+        "run_name": f"question_generation_round_{question_number}",
+        "tags": ["interview_coach", "question_agent", topic.lower()],
+        "metadata": {
+            "topic": topic,
+            "question_number": question_number,
+            "has_jd": bool(job_description),
+            "prior_questions_count": len(history or [])
+        }
+    }
 
+    result = graph.invoke(state, config=config)
     return result["question"]
 
 
-def run_evaluation(question, answer, topic, job_description, resume_context="", history=None):
+def run_evaluation(question: str, answer: str, topic: str, job_description: str = "", resume_context: str = "", history: Optional[List[dict]] = None) -> dict:
     """
-    Run the graph in 'evaluate' mode to evaluate an answer
-    and generate a per-question report.
-
-    Returns a dict with 'feedback' and 'report'.
+    Run the graph in 'evaluate' mode to evaluate an answer and generate a report.
+    Traced via LangSmith with enriched tags and metadata.
     """
-    state = {
+    state: InterviewState = {
         "mode": "evaluate",
         "topic": topic,
         "job_description": job_description,
@@ -111,7 +119,17 @@ def run_evaluation(question, answer, topic, job_description, resume_context="", 
         "report": ""
     }
 
-    result = graph.invoke(state)
+    config = {
+        "run_name": "answer_evaluation_pipeline",
+        "tags": ["interview_coach", "evaluation_agent", "report_agent", topic.lower()],
+        "metadata": {
+            "topic": topic,
+            "answer_length": len(answer),
+            "question": question[:100]
+        }
+    }
+
+    result = graph.invoke(state, config=config)
 
     return {
         "feedback": result["feedback"],
@@ -119,14 +137,12 @@ def run_evaluation(question, answer, topic, job_description, resume_context="", 
     }
 
 
-def run_final_report(history):
+def run_final_report(history: List[dict]) -> str:
     """
-    Run the graph in 'final_report' mode to generate a
-    comprehensive interview summary report.
-
-    Returns the report string.
+    Run the graph in 'final_report' mode to generate a comprehensive interview report.
+    Traced via LangSmith with enriched tags and metadata.
     """
-    state = {
+    state: InterviewState = {
         "mode": "final_report",
         "topic": "",
         "job_description": "",
@@ -139,6 +155,70 @@ def run_final_report(history):
         "report": ""
     }
 
-    result = graph.invoke(state)
+    config = {
+        "run_name": "final_interview_summary_report",
+        "tags": ["interview_coach", "final_report"],
+        "metadata": {
+            "total_questions_answered": len(history)
+        }
+    }
 
+    result = graph.invoke(state, config=config)
     return result["report"]
+
+
+# -------------------------
+# Async & Streaming Helpers for WebSocket Integration
+# -------------------------
+
+async def arun_question(topic: str, job_description: str, question_number: int = 1, history: Optional[List[dict]] = None) -> str:
+    """Async question runner for WebSocket servers."""
+    state: InterviewState = {
+        "mode": "ask",
+        "topic": topic,
+        "job_description": job_description,
+        "question_number": question_number,
+        "history": history or [],
+        "answer": "",
+        "resume_context": "",
+        "question": "",
+        "feedback": "",
+        "report": ""
+    }
+
+    config = {
+        "run_name": f"ws_question_round_{question_number}",
+        "tags": ["websocket", "question_agent", topic.lower()],
+        "metadata": {"topic": topic, "question_number": question_number}
+    }
+
+    result = await graph.ainvoke(state, config=config)
+    return result["question"]
+
+
+async def arun_evaluation(question: str, answer: str, topic: str, job_description: str = "", resume_context: str = "", history: Optional[List[dict]] = None) -> dict:
+    """Async evaluation runner for WebSocket servers."""
+    state: InterviewState = {
+        "mode": "evaluate",
+        "topic": topic,
+        "job_description": job_description,
+        "question": question,
+        "answer": answer,
+        "resume_context": resume_context,
+        "question_number": 0,
+        "history": history or [],
+        "feedback": "",
+        "report": ""
+    }
+
+    config = {
+        "run_name": "ws_answer_evaluation",
+        "tags": ["websocket", "evaluation_agent", "report_agent", topic.lower()],
+        "metadata": {"topic": topic, "answer_length": len(answer)}
+    }
+
+    result = await graph.ainvoke(state, config=config)
+    return {
+        "feedback": result["feedback"],
+        "report": result["report"]
+    }

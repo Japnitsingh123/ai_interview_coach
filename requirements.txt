@@ -12,6 +12,10 @@ torchvision
 langchain-chroma
 langchain-groq
 langgraph
+langsmith
+fastapi
+uvicorn
+websockets
 python-dotenv
 gtts
 faster-whisper
