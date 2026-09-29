@@ -8,7 +8,14 @@ os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_PROJECT"] = "test-ai-interview-coach"
 
 from agents.utils import strip_thinking, get_model_name
-from graph import graph, InterviewState
+from graph import (
+    graph,
+    InterviewState,
+    initialize_state_node,
+    update_state_node,
+    check_progress,
+    route_entry_point
+)
 from ws_server import app as ws_app
 
 
@@ -35,31 +42,69 @@ def test_get_model_name_default():
 
 
 def test_langgraph_compilation():
-    """Test that the LangGraph StateGraph compiles and contains required nodes."""
+    """Test that the LangGraph StateGraph compiles and contains all required state machine nodes."""
     assert graph is not None
     nodes = graph.nodes
+    assert "initialize" in nodes
     assert "question" in nodes
     assert "evaluation" in nodes
     assert "report" in nodes
+    assert "update_state" in nodes
+    assert "final_report" in nodes
 
 
-def test_interview_state_structure():
-    """Test that InterviewState contains expected keys."""
-    sample_state = {
-        "mode": "ask",
-        "topic": "Projects",
-        "job_description": "Software Engineer role",
-        "answer": "",
-        "resume_context": "",
-        "question": "",
-        "question_number": 1,
-        "feedback": "",
-        "report": "",
+def test_interview_state_initialization():
+    """Test initialize_state_node resets and configures state."""
+    init_res = initialize_state_node({
+        "topic": "System Design",
+        "job_description": "Staff Engineer"
+    })
+    assert init_res["topic"] == "System Design"
+    assert init_res["job_description"] == "Staff Engineer"
+    assert init_res["question_number"] == 1
+    assert init_res["history"] == []
+    assert init_res["is_complete"] is False
+
+
+def test_update_state_node():
+    """Test update_state_node appends to history and increments question number."""
+    mock_state = {
+        "question": "Explain Paxos consensus.",
+        "answer": "Paxos is a consensus protocol...",
+        "feedback": "Technical Score: 9/10",
+        "report": "Solid understanding of consensus.",
         "history": []
     }
-    assert sample_state["mode"] == "ask"
-    assert sample_state["question_number"] == 1
-    assert isinstance(sample_state["history"], list)
+    updated = update_state_node(mock_state)
+    assert len(updated["history"]) == 1
+    assert updated["history"][0]["question"] == "Explain Paxos consensus."
+    assert updated["history"][0]["answer"] == "Paxos is a consensus protocol..."
+    assert updated["question_number"] == 2
+    assert updated["answer"] == ""
+
+
+def test_check_progress_conditional_edge():
+    """Test LangGraph check_progress routing logic (< 5 -> question, >= 5 -> final_report)."""
+    # Case 1: 0 completed questions
+    assert check_progress({"history": []}) == "question"
+
+    # Case 2: 4 completed questions
+    assert check_progress({"history": [1, 2, 3, 4]}) == "question"
+
+    # Case 3: 5 completed questions -> routes to final_report
+    assert check_progress({"history": [1, 2, 3, 4, 5]}) == "final_report"
+
+    # Case 4: > 5 completed questions
+    assert check_progress({"history": [1, 2, 3, 4, 5, 6]}) == "final_report"
+
+
+def test_route_entry_point():
+    """Test entry point routing based on action parameter."""
+    assert route_entry_point({"action": "init"}) == "initialize"
+    assert route_entry_point({"action": "question"}) == "question"
+    assert route_entry_point({"action": "evaluate"}) == "evaluation"
+    assert route_entry_point({"action": "advance"}) == "update_state"
+    assert route_entry_point({"action": "final_report"}) == "final_report"
 
 
 def test_websocket_server_health():

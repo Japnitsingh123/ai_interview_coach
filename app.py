@@ -4,7 +4,13 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from ingest import ingest_resume
-from graph import run_question, run_evaluation, run_final_report
+from graph import (
+    start_interview,
+    evaluate_answer,
+    advance_interview,
+    submit_and_advance,
+    InterviewState
+)
 from tts import text_to_speech
 from streamlit_mic_recorder import mic_recorder
 from stt import speech_to_text
@@ -151,6 +157,13 @@ st.markdown("""
 with st.sidebar:
     st.markdown("### ⚙️ System Architecture")
 
+    # LangGraph State Manager Badge
+    with st.container():
+        st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
+        st.markdown('<div><span class="pulse-dot"></span> <b>LangGraph State Machine</b></div>', unsafe_allow_html=True)
+        st.caption("Central StateGraph controls Initialization, Question Gen, Evaluation, State Updates & Loop Check.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
     # LangSmith Tracing Panel
     ls_api_key = os.getenv("LANGCHAIN_API_KEY")
     if not ls_api_key and hasattr(st, "secrets") and "LANGCHAIN_API_KEY" in st.secrets:
@@ -196,16 +209,11 @@ with st.sidebar:
         """)
 
     # Reset Session
-    if st.session_state.get("question_count", 0) > 0:
+    if st.session_state.get("interview_state") is not None:
         st.divider()
         if st.button("🔄 Reset Interview Session", use_container_width=True):
-            st.session_state.question_count = 0
-            st.session_state.answers = []
-            st.session_state.feedbacks = []
-            st.session_state.reports = []
-            st.session_state.history = []
-            if "final_report" in st.session_state:
-                del st.session_state["final_report"]
+            st.session_state.interview_state = None
+            st.session_state.voice_answer = ""
             st.rerun()
 
 # ---------------------------------------------------------
@@ -216,7 +224,7 @@ st.markdown("""
     <div class="hero-title">🤖 AI Technical Interview Coach</div>
     <p class="hero-subtitle">Agentic Multi-Round Technical Preparation powered by LangGraph, ChromaDB, Groq LLM & Whisper</p>
     <div style="margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap;">
-        <span class="badge-pill badge-primary">✨ LangGraph Pipeline</span>
+        <span class="badge-pill badge-primary">✨ LangGraph State Machine</span>
         <span class="badge-pill badge-success">🎙️ Voice & Faster-Whisper</span>
         <span class="badge-pill badge-purple">⚡ Groq LPU Accelerated</span>
         <span class="badge-pill badge-primary">🔍 LangSmith Tracing</span>
@@ -225,40 +233,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# Session State Initialization
+# Central Session State Initialization (LangGraph State)
 # ---------------------------------------------------------
-if "question_count" not in st.session_state:
-    st.session_state.question_count = 0
-
-if "question" not in st.session_state:
-    st.session_state.question = ""
-
-if "answers" not in st.session_state:
-    st.session_state.answers = []
-
-if "feedbacks" not in st.session_state:
-    st.session_state.feedbacks = []
-
-if "reports" not in st.session_state:
-    st.session_state.reports = []
-
-if "history" not in st.session_state:
-    st.session_state.history = []
+if "interview_state" not in st.session_state:
+    st.session_state.interview_state = None
 
 if "voice_answer" not in st.session_state:
     st.session_state.voice_answer = ""
 
-if "topic" not in st.session_state:
-    st.session_state.topic = "Projects"
-
-if "job_description" not in st.session_state:
-    st.session_state.job_description = ""
-
 
 # ---------------------------------------------------------
-# Step 1: Resume Setup & Configuration (Before Interview)
+# Stage 1: Setup & Initialization (Before Interview Starts)
 # ---------------------------------------------------------
-if st.session_state.question_count == 0:
+if st.session_state.interview_state is None:
     st.markdown("### 📋 1. Setup Your Interview Context")
 
     col1, col2 = st.columns([1, 1], gap="medium")
@@ -299,51 +286,49 @@ if st.session_state.question_count == 0:
             help="Choose the primary category for technical question generation."
         )
 
-    st.session_state.topic = topic
-    st.session_state.job_description = job_description
-
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🚀 Start 5-Round Mock Interview", type="primary", use_container_width=True):
-        st.session_state.question_count = 1
-        st.session_state.answers = []
-        st.session_state.feedbacks = []
-        st.session_state.reports = []
-        st.session_state.history = []
-
-        with st.spinner("🤖 Question Agent is analyzing your profile and crafting your first question..."):
-            st.session_state.question = run_question(
-                st.session_state.topic,
-                st.session_state.job_description,
-                question_number=1,
-                history=[]
+        with st.spinner("🤖 LangGraph State Machine initializing session & generating Question #1..."):
+            # LangGraph handles initialization and generates question 1
+            st.session_state.interview_state = start_interview(
+                topic=topic,
+                job_description=job_description
             )
+            st.session_state.voice_answer = ""
         st.rerun()
 
+
 # ---------------------------------------------------------
-# Step 2: Active Technical Interview (Rounds 1 to 5)
+# Stage 2: Active Technical Interview (Controlled by LangGraph)
 # ---------------------------------------------------------
-elif st.session_state.question_count >= 1 and st.session_state.question_count <= 5:
+elif not st.session_state.interview_state.get("is_complete", False):
+    state = st.session_state.interview_state
+    history = state.get("history", [])
+    current_round = len(history) + 1
+    current_question = state.get("question", "")
+    current_topic = state.get("topic", "General")
+
     # Visual Progress Bar
-    progress_val = int((st.session_state.question_count - 1) / 5 * 100)
+    progress_val = int((current_round - 1) / 5 * 100)
     col_prog1, col_prog2 = st.columns([4, 1])
     with col_prog1:
-        st.progress(progress_val / 100, text=f"Interview Progress: Round {st.session_state.question_count} of 5")
+        st.progress(progress_val / 100, text=f"Interview Progress: Round {current_round} of 5")
     with col_prog2:
-        st.markdown(f'<div style="text-align:right;"><span class="badge-pill badge-primary">Topic: {st.session_state.topic}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:right;"><span class="badge-pill badge-primary">Topic: {current_topic}</span></div>', unsafe_allow_html=True)
 
     # Question Display Card
     st.markdown(f"""
     <div class="question-card">
-        <div class="question-header">🤖 AI Interviewer &bull; Question {st.session_state.question_count} of 5</div>
-        <div class="question-text">{st.session_state.question}</div>
+        <div class="question-header">🤖 AI Interviewer &bull; Question {current_round} of 5</div>
+        <div class="question-text">{current_question}</div>
     </div>
     """, unsafe_allow_html=True)
 
     # Audio Player for Voice Questions
     try:
-        audio_file = text_to_speech(st.session_state.question)
+        audio_file = text_to_speech(current_question)
         st.audio(audio_file)
-    except Exception as e:
+    except Exception:
         pass
 
     st.markdown("---")
@@ -357,7 +342,7 @@ elif st.session_state.question_count >= 1 and st.session_state.question_count <=
         audio = mic_recorder(
             start_prompt="🎤 Start Recording Answer",
             stop_prompt="⏹ Stop & Transcribe",
-            key=f"recorder_{st.session_state.question_count}"
+            key=f"recorder_round_{current_round}"
         )
 
     if audio:
@@ -377,7 +362,7 @@ elif st.session_state.question_count >= 1 and st.session_state.question_count <=
         value=st.session_state.voice_answer,
         height=180,
         placeholder="Structure your answer with technical details, architecture decisions, and metrics...",
-        key=f"answer_input_{st.session_state.question_count}"
+        key=f"answer_input_round_{current_round}"
     )
 
     # Action Buttons
@@ -388,80 +373,72 @@ elif st.session_state.question_count >= 1 and st.session_state.question_count <=
             if not answer.strip():
                 st.error("Please provide an answer before evaluation.")
             else:
-                with st.spinner("🤖 Evaluation & Report Agents are analyzing your answer with LangGraph..."):
-                    result = run_evaluation(
-                        st.session_state.question,
-                        answer,
-                        st.session_state.topic,
-                        st.session_state.job_description,
-                        history=st.session_state.history
+                with st.spinner("🤖 LangGraph Evaluation & Report Agents evaluating your response..."):
+                    # LangGraph evaluates the answer and generates scorecard feedback
+                    st.session_state.interview_state = evaluate_answer(
+                        current_state=st.session_state.interview_state,
+                        answer=answer
                     )
 
-                feedback = result["feedback"]
-                report = result["report"]
-
-                st.session_state.answers.append(answer)
-                st.session_state.feedbacks.append(feedback)
-                st.session_state.reports.append(report)
-
-                st.session_state.history.append({
-                    "question": st.session_state.question,
-                    "answer": answer,
-                    "feedback": feedback
-                })
-
-                # Display Feedback Cards
-                st.markdown('<div class="feedback-card">', unsafe_allow_html=True)
-                st.markdown("### 📝 Evaluation Feedback & Scoring")
-                st.markdown(feedback)
-                st.markdown("---")
-                st.markdown("### 📋 Question Performance Report")
-                st.markdown(report)
-                st.markdown('</div>', unsafe_allow_html=True)
+    # Display Feedback Cards if feedback is present for the active question
+    active_feedback = st.session_state.interview_state.get("feedback", "")
+    active_report = st.session_state.interview_state.get("report", "")
+    if active_feedback:
+        st.markdown('<div class="feedback-card">', unsafe_allow_html=True)
+        st.markdown("### 📝 Evaluation Feedback & Scoring")
+        st.markdown(active_feedback)
+        if active_report:
+            st.markdown("---")
+            st.markdown("### 📋 Question Performance Report")
+            st.markdown(active_report)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col_next:
-        if st.button("➡️ Advance to Next Question", use_container_width=True):
-            st.session_state.question_count += 1
-            st.session_state.voice_answer = ""
-
-            if st.session_state.question_count <= 5:
-                with st.spinner("🤖 Question Agent is crafting your next interview question..."):
-                    st.session_state.question = run_question(
-                        st.session_state.topic,
-                        st.session_state.job_description,
-                        question_number=st.session_state.question_count,
-                        history=st.session_state.history
+        button_label = "➡️ Advance to Next Question" if current_round < 5 else "🏁 Complete Interview & View Report"
+        if st.button(button_label, use_container_width=True):
+            # If answer was entered but evaluate wasn't clicked, run full turn; otherwise advance state
+            with st.spinner("🤖 LangGraph State Machine updating state and checking progress..."):
+                if answer.strip() and not active_feedback:
+                    st.session_state.interview_state = submit_and_advance(
+                        current_state=st.session_state.interview_state,
+                        answer=answer
                     )
+                else:
+                    st.session_state.interview_state = advance_interview(
+                        current_state=st.session_state.interview_state
+                    )
+                st.session_state.voice_answer = ""
             st.rerun()
 
+
 # ---------------------------------------------------------
-# Step 3: Interview Completed — Final Comprehensive Assessment
+# Stage 3: Interview Completed — LangGraph Final Report Assessment
 # ---------------------------------------------------------
-elif st.session_state.question_count > 5:
+else:
+    state = st.session_state.interview_state
+    history = state.get("history", [])
+    topic = state.get("topic", "Technical")
+    final_report_text = state.get("final_report", "")
+
     st.markdown("""
     <div style="text-align: center; padding: 24px; background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: 16px; margin-bottom: 24px;">
         <h2 style="color: #34D399; margin: 0;">🎉 Interview Session Completed!</h2>
-        <p style="color: #94A3B8; margin-top: 8px;">All 5 technical interview rounds successfully completed and analyzed.</p>
+        <p style="color: #94A3B8; margin-top: 8px;">All 5 technical interview rounds successfully completed and managed by LangGraph.</p>
     </div>
     """, unsafe_allow_html=True)
-
-    # Generate final report if not present
-    if "final_report" not in st.session_state:
-        with st.spinner("🤖 Report Agent is compiling your comprehensive evaluation across all 5 questions..."):
-            st.session_state.final_report = run_final_report(st.session_state.history)
 
     # Metrics Overview
     metric_col1, metric_col2, metric_col3 = st.columns(3)
     with metric_col1:
-        st.metric("Total Questions Attempted", len(st.session_state.answers))
+        st.metric("Total Questions Attempted", len(history))
     with metric_col2:
-        st.metric("Focus Domain", st.session_state.topic)
+        st.metric("Focus Domain", topic)
     with metric_col3:
-        st.metric("Session Status", "Evaluated ✅")
+        st.metric("Session Status", "Evaluated by LangGraph ✅")
 
     st.markdown("### 📊 Comprehensive Performance Report")
     st.markdown('<div class="feedback-card">', unsafe_allow_html=True)
-    st.markdown(st.session_state.final_report)
+    st.markdown(final_report_text)
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -470,7 +447,7 @@ elif st.session_state.question_count > 5:
     with col_down:
         st.download_button(
             label="📥 Download Interview Assessment (.md)",
-            data=st.session_state.final_report,
+            data=final_report_text,
             file_name="interview_performance_report.md",
             mime="text/markdown",
             use_container_width=True
@@ -478,11 +455,6 @@ elif st.session_state.question_count > 5:
 
     with col_restart:
         if st.button("🔄 Start a New Interview Session", type="primary", use_container_width=True):
-            st.session_state.question_count = 0
-            st.session_state.answers = []
-            st.session_state.feedbacks = []
-            st.session_state.reports = []
-            st.session_state.history = []
-            if "final_report" in st.session_state:
-                del st.session_state["final_report"]
+            st.session_state.interview_state = None
+            st.session_state.voice_answer = ""
             st.rerun()

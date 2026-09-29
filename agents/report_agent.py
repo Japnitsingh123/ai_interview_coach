@@ -25,19 +25,20 @@ llm = ChatGroq(
 
 def report_agent(state):
     mode = state.get("mode", "evaluate")
+    action = state.get("action", "")
 
     # Final report mode — generate cumulative report across all questions
-    if mode == "final_report":
-        return _generate_final_report(state)
+    if mode == "final_report" or action == "final_report":
+        return generate_final_report(state)
 
     # Per-question report mode
-    return _generate_question_report(state)
+    return generate_question_report(state)
 
 
-def _generate_question_report(state):
-    question = state["question"]
-    answer = state["answer"]
-    feedback = state["feedback"]
+def generate_question_report(state):
+    question = state.get("question", "")
+    answer = state.get("answer", "")
+    feedback = state.get("feedback", "")
 
     prompt = f"""
 You are an experienced technical interviewer.
@@ -70,12 +71,15 @@ Keep it concise and encouraging.
     }
 
 
-def _generate_final_report(state):
+def generate_final_report(state):
     history = state.get("history", [])
 
     if not history:
+        msg = "No interview data available for report generation."
         return {
-            "report": "No interview data available for report generation."
+            "report": msg,
+            "final_report": msg,
+            "is_complete": True
         }
 
     # Build a comprehensive summary from all Q&A pairs
@@ -110,7 +114,13 @@ Make the report professional, detailed, and actionable.
 """
 
     response = llm.invoke(prompt)
+    report_text = strip_thinking(response.content)
 
     return {
-        "report": strip_thinking(response.content)
+        "report": report_text,
+        "final_report": report_text,
+        "is_complete": True
     }
+
+
+_generate_final_report = generate_final_report

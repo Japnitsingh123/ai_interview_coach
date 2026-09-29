@@ -13,7 +13,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import uvicorn
 
-from graph import arun_question, arun_evaluation, run_final_report
+from graph import (
+    astart_interview,
+    aevaluate_answer,
+    aadvance_interview,
+    arun_question,
+    arun_evaluation,
+    run_final_report
+)
 
 load_dotenv()
 
@@ -87,13 +94,22 @@ async def websocket_interview_endpoint(websocket: WebSocket):
     1. Ping:
        {"action": "ping"}
 
-    2. Generate Question:
+    2. LangGraph Start Interview:
+       {"action": "start", "topic": "Projects", "job_description": "..."}
+
+    3. LangGraph Evaluate Answer:
+       {"action": "evaluate_state", "state": {...}, "answer": "..."}
+
+    4. LangGraph Advance Round:
+       {"action": "advance_state", "state": {...}}
+
+    5. Legacy Ask / Question Generation:
        {"action": "ask", "topic": "Projects", "job_description": "...", "question_number": 1, "history": []}
 
-    3. Evaluate Answer:
+    6. Legacy Answer Evaluation:
        {"action": "evaluate", "question": "...", "answer": "...", "topic": "...", "job_description": "...", "history": []}
 
-    4. Final Report:
+    7. Legacy Final Report:
        {"action": "final_report", "history": [...]}
     """
     await manager.connect(websocket)
@@ -101,7 +117,7 @@ async def websocket_interview_endpoint(websocket: WebSocket):
         # Send initial connection handshake
         await manager.send_json(websocket, {
             "event": "connected",
-            "message": "Connected to AI Interview Coach Real-Time WebSocket",
+            "message": "Connected to AI Interview Coach Real-Time WebSocket (LangGraph State Machine)",
             "session_status": "ready"
         })
 
@@ -125,7 +141,78 @@ async def websocket_interview_endpoint(websocket: WebSocket):
                     "timestamp": payload.get("timestamp")
                 })
 
-            # 2. Real-Time Question Generation
+            # 2. LangGraph State: Start Session
+            elif action == "start":
+                topic = payload.get("topic", "Projects")
+                job_description = payload.get("job_description", "")
+
+                await manager.send_json(websocket, {
+                    "event": "agent_thinking",
+                    "agent": "langgraph_state_machine",
+                    "message": f"🤖 LangGraph initializing interview on {topic}..."
+                })
+
+                try:
+                    state = await astart_interview(topic=topic, job_description=job_description)
+                    await manager.send_json(websocket, {
+                        "event": "state_updated",
+                        "state": state
+                    })
+                except Exception as e:
+                    logger.error(f"Error in ws start interview: {e}")
+                    await manager.send_json(websocket, {
+                        "event": "error",
+                        "message": str(e)
+                    })
+
+            # 3. LangGraph State: Evaluate Answer
+            elif action == "evaluate_state":
+                state = payload.get("state", {})
+                answer = payload.get("answer", "")
+
+                await manager.send_json(websocket, {
+                    "event": "agent_thinking",
+                    "agent": "evaluation_agent",
+                    "message": "🤖 LangGraph evaluating answer..."
+                })
+
+                try:
+                    updated_state = await aevaluate_answer(state, answer)
+                    await manager.send_json(websocket, {
+                        "event": "state_updated",
+                        "state": updated_state
+                    })
+                except Exception as e:
+                    logger.error(f"Error in ws evaluate_state: {e}")
+                    await manager.send_json(websocket, {
+                        "event": "error",
+                        "message": str(e)
+                    })
+
+            # 4. LangGraph State: Advance Round / Check Progress
+            elif action == "advance_state":
+                state = payload.get("state", {})
+
+                await manager.send_json(websocket, {
+                    "event": "agent_thinking",
+                    "agent": "langgraph_state_machine",
+                    "message": "🤖 LangGraph advancing state and checking progress..."
+                })
+
+                try:
+                    updated_state = await aadvance_interview(state)
+                    await manager.send_json(websocket, {
+                        "event": "state_updated",
+                        "state": updated_state
+                    })
+                except Exception as e:
+                    logger.error(f"Error in ws advance_state: {e}")
+                    await manager.send_json(websocket, {
+                        "event": "error",
+                        "message": str(e)
+                    })
+
+            # 5. Legacy Ask Question Generation
             elif action == "ask":
                 topic = payload.get("topic", "Projects")
                 job_description = payload.get("job_description", "")
@@ -160,7 +247,7 @@ async def websocket_interview_endpoint(websocket: WebSocket):
                         "message": str(e)
                     })
 
-            # 3. Real-Time Answer Evaluation
+            # 6. Legacy Answer Evaluation
             elif action == "evaluate":
                 question = payload.get("question", "")
                 answer = payload.get("answer", "")
@@ -203,7 +290,7 @@ async def websocket_interview_endpoint(websocket: WebSocket):
                         "message": str(e)
                     })
 
-            # 4. Final Comprehensive Report
+            # 7. Legacy Final Report
             elif action == "final_report":
                 history = payload.get("history", [])
 
@@ -230,7 +317,7 @@ async def websocket_interview_endpoint(websocket: WebSocket):
             else:
                 await manager.send_json(websocket, {
                     "event": "unknown_action",
-                    "message": f"Action '{action}' is not supported. Use 'ask', 'evaluate', 'final_report', or 'ping'."
+                    "message": f"Action '{action}' is not supported. Use 'start', 'evaluate_state', 'advance_state', 'ask', 'evaluate', 'final_report', or 'ping'."
                 })
 
     except WebSocketDisconnect:
