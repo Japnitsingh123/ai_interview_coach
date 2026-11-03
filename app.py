@@ -24,7 +24,7 @@ st.set_page_config(
     page_title="AI Interview Coach — Autonomous Mock Platform",
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # ---------------------------------------------------------
@@ -140,81 +140,25 @@ st.markdown("""
         100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
 
-    /* Sidebar Clean Enhancements */
-    .sidebar-card {
-        background: rgba(30, 41, 59, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 10px;
-        padding: 14px;
-        margin-bottom: 14px;
+    /* Hide Sidebar */
+    [data-testid="stSidebar"], [data-testid="collapsedControl"] {
+        display: none !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# Sidebar: System Status & Tracing
+# Tracing Configuration
 # ---------------------------------------------------------
-with st.sidebar:
-    st.markdown("### ⚙️ System Architecture")
+ls_api_key = os.getenv("LANGCHAIN_API_KEY")
+if not ls_api_key and hasattr(st, "secrets") and "LANGCHAIN_API_KEY" in st.secrets:
+    ls_api_key = st.secrets["LANGCHAIN_API_KEY"]
 
-    # LangGraph State Manager Badge
-    with st.container():
-        st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
-        st.markdown('<div><span class="pulse-dot"></span> <b>LangGraph State Machine</b></div>', unsafe_allow_html=True)
-        st.caption("Central StateGraph controls Initialization, Question Gen, Evaluation, State Updates & Loop Check.")
-        st.markdown('</div>', unsafe_allow_html=True)
+if ls_api_key and len(ls_api_key.strip()) > 5:
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_API_KEY"] = ls_api_key
+    os.environ["LANGCHAIN_PROJECT"] = os.getenv("LANGCHAIN_PROJECT", "ai-interview-coach")
 
-    # LangSmith Tracing Panel
-    ls_api_key = os.getenv("LANGCHAIN_API_KEY")
-    if not ls_api_key and hasattr(st, "secrets") and "LANGCHAIN_API_KEY" in st.secrets:
-        ls_api_key = st.secrets["LANGCHAIN_API_KEY"]
-
-    ls_enabled = bool(ls_api_key and len(ls_api_key.strip()) > 5)
-
-    with st.container():
-        st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
-        if ls_enabled:
-            os.environ["LANGCHAIN_TRACING_V2"] = "true"
-            os.environ["LANGCHAIN_API_KEY"] = ls_api_key
-            os.environ["LANGCHAIN_PROJECT"] = os.getenv("LANGCHAIN_PROJECT", "ai-interview-coach")
-            st.markdown('<div><span class="pulse-dot"></span> <b>LangSmith Observability</b></div>', unsafe_allow_html=True)
-            st.caption(f"Traces active for: `{os.environ['LANGCHAIN_PROJECT']}`")
-            st.markdown("[📊 Open Tracing Dashboard](https://smith.langchain.com/)")
-        else:
-            st.markdown("🟡 **LangSmith Tracing: Standby**")
-            user_ls_key = st.text_input("Enter LangSmith API Key", type="password", placeholder="lsv2_pt_...")
-            if user_ls_key:
-                os.environ["LANGCHAIN_TRACING_V2"] = "true"
-                os.environ["LANGCHAIN_API_KEY"] = user_ls_key
-                os.environ["LANGCHAIN_PROJECT"] = "ai-interview-coach"
-                st.success("🟢 Connected to LangSmith!")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # Real-Time WebSocket Status
-    with st.container():
-        st.markdown('<div class="sidebar-card">', unsafe_allow_html=True)
-        st.markdown('<div><span class="pulse-dot"></span> <b>Real-Time WebSockets</b></div>', unsafe_allow_html=True)
-        ws_port = os.getenv("WS_PORT", "8000")
-        st.caption(f"Duplex Streaming Port: `{ws_port}`")
-        st.code(f"ws://localhost:{ws_port}/ws/interview", language="text")
-        st.caption("Start standalone server: `python ws_server.py`")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # Candidate Prep Tips
-    with st.expander("💡 Candidate Success Tips"):
-        st.markdown("""
-        * **STAR Technique:** Structure answers by *Situation, Task, Action, Result*.
-        * **Be Specific:** Mention concrete metrics, technologies, and trade-offs.
-        * **Speak Clearly:** Use the voice recorder or type concise technical answers.
-        """)
-
-    # Reset Session
-    if st.session_state.get("interview_state") is not None:
-        st.divider()
-        if st.button("🔄 Reset Interview Session", use_container_width=True):
-            st.session_state.interview_state = None
-            st.session_state.voice_answer = ""
-            st.rerun()
 
 # ---------------------------------------------------------
 # Hero Banner
