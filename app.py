@@ -371,7 +371,7 @@ elif not st.session_state.interview_state.get("is_complete", False):
                 if text and text.strip():
                     st.session_state.voice_answer = text.strip()
                     st.session_state[answer_key] = text.strip()
-                    st.success("✅ Voice transcribed successfully!")
+                    st.rerun()
             except Exception as e:
                 st.error(f"Transcription error: {e}")
 

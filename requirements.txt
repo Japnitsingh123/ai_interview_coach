@@ -19,4 +19,5 @@ websockets
 python-dotenv
 gtts
 faster-whisper
+av<18
 streamlit-mic-recorder
