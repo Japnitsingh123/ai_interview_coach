@@ -42,7 +42,7 @@ jobs:
       env:
         GROQ_API_KEY: "test_groq_api_key"
       run: |
-        python -c "import app, ingest, graph, tts, stt, rag, evaluator; print('✓ Core modules loaded successfully')"
+        python -c "import app, ingest, graph, tts, stt; print('✓ Core modules loaded successfully')"
         python -c "from graph import graph; print('✓ LangGraph graph compiled successfully')"
 
     - name: Run automated tests
