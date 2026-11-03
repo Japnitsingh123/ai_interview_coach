@@ -1,30 +1,12 @@
 import os
 import streamlit as st
 from dotenv import load_dotenv
-from agents.utils import strip_thinking, get_model_name
-
-from langchain_groq import ChatGroq
+from agents.utils import strip_thinking, get_model_name, get_groq_llm
 
 load_dotenv()
 
-# Support both .env and Streamlit secrets
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    try:
-        if hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
-            GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-    except Exception:
-        pass
-
-MODEL_NAME = get_model_name()
-
-# Setting max_tokens=800 stays safely within Groq's rate limits
-llm = ChatGroq(
-    groq_api_key=GROQ_API_KEY,
-    model_name=MODEL_NAME,
-    temperature=0,
-    max_tokens=800
-)
+# Safe initialization for module export & tests
+llm = get_groq_llm(temperature=0, max_tokens=800)
 
 
 def report_agent(state):
@@ -68,7 +50,8 @@ Generate a brief report with:
 Keep it concise and encouraging.
 """
 
-    response = llm.invoke(prompt)
+    active_llm = get_groq_llm(temperature=0, max_tokens=800)
+    response = active_llm.invoke(prompt)
 
     return {
         "report": strip_thinking(response.content)
@@ -117,7 +100,8 @@ Generate a professional report with the following sections:
 Make the report professional, detailed, and actionable.
 """
 
-    response = llm.invoke(prompt)
+    active_llm = get_groq_llm(temperature=0, max_tokens=800)
+    response = active_llm.invoke(prompt)
     report_text = strip_thinking(response.content)
 
     return {

@@ -1,46 +1,45 @@
 import os
 import streamlit as st
 from dotenv import load_dotenv
-from agents.utils import strip_thinking, get_model_name
+from agents.utils import strip_thinking, get_model_name, get_groq_llm
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 
 load_dotenv()
 
-# Support both .env and Streamlit secrets
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    try:
-        if hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
-            GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-    except Exception:
-        pass
+# Safe initialization for module export & tests
+llm = get_groq_llm(temperature=0.7, max_tokens=300)
 
-MODEL_NAME = get_model_name()
+_retriever = None
 
-# Setting max_tokens=300 stays safely below Groq's 1000 OTPM rate limit
-llm = ChatGroq(
-    groq_api_key=GROQ_API_KEY,
-    model_name=MODEL_NAME,
-    temperature=0.7,
-    max_tokens=300
-)
 
-embeddings = HuggingFaceEmbeddings(
-    model_name="BAAI/bge-small-en-v1.5"
-)
+def get_retriever():
+    global _retriever
+    if _retriever is None:
+        embeddings = HuggingFaceEmbeddings(
+            model_name="BAAI/bge-small-en-v1.5"
+        )
+        vectorstore = Chroma(
+            persist_directory="chroma_db",
+            embedding_function=embeddings
+        )
+        _retriever = vectorstore.as_retriever(
+            search_kwargs={"k": 3}
+        )
+    return _retriever
 
-vectorstore = Chroma(
-    persist_directory="chroma_db",
-    embedding_function=embeddings
-)
 
-retriever = vectorstore.as_retriever(
-    search_kwargs={"k": 3}
-)
+class _LazyRetrieverProxy:
+    def invoke(self, *args, **kwargs):
+        return get_retriever().invoke(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(get_retriever(), name)
+
+
+retriever = _LazyRetrieverProxy()
 
 prompt = PromptTemplate(
     input_variables=[
@@ -111,7 +110,8 @@ def question_agent(state):
         previous_questions=previous_questions
     )
 
-    response = llm.invoke(final_prompt)
+    active_llm = get_groq_llm(temperature=0.7, max_tokens=300)
+    response = active_llm.invoke(final_prompt)
 
     return {
         "question": strip_thinking(response.content),

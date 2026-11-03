@@ -30,6 +30,37 @@ def get_model_name():
     return model
 
 
+def get_groq_api_key():
+    """
+    Safely get Groq API key from environment or Streamlit secrets.
+    """
+    key = os.getenv("GROQ_API_KEY")
+    if not key:
+        try:
+            if hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
+                key = st.secrets["GROQ_API_KEY"]
+        except Exception:
+            pass
+    if key and key.strip():
+        return key.strip()
+    return None
+
+
+def get_groq_llm(temperature=0.7, max_tokens=300):
+    """
+    Safely initialize ChatGroq instance.
+    Uses placeholder key if none configured to prevent module-import-time crash.
+    """
+    from langchain_groq import ChatGroq
+    key = get_groq_api_key() or "gsk_placeholder_key"
+    return ChatGroq(
+        groq_api_key=key,
+        model_name=get_model_name(),
+        temperature=temperature,
+        max_tokens=max_tokens
+    )
+
+
 def strip_thinking(text):
     """
     Strip <think>...</think> blocks from model output.

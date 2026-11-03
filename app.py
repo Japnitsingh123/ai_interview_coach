@@ -181,6 +181,31 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
+# Groq API Key Validation & Fallback Input
+# ---------------------------------------------------------
+groq_key = os.getenv("GROQ_API_KEY")
+if not groq_key:
+    try:
+        if hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
+            groq_key = st.secrets["GROQ_API_KEY"]
+    except Exception:
+        pass
+
+if not groq_key:
+    st.warning("⚠️ **Groq API Key Required** — Please enter your Groq API Key to proceed with the mock interview.")
+    col_k1, col_k2 = st.columns([3, 1])
+    with col_k1:
+        entered_key = st.text_input("Groq API Key", type="password", placeholder="gsk_...")
+    with col_k2:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+        if st.button("Save and Continue", type="primary"):
+            if entered_key and entered_key.strip():
+                os.environ["GROQ_API_KEY"] = entered_key.strip()
+                st.rerun()
+    st.info('💡 You can also configure GROQ_API_KEY = "gsk_..." in Streamlit Cloud Settings -> Secrets.')
+    st.stop()
+
+# ---------------------------------------------------------
 # Central Session State Initialization (LangGraph State)
 # ---------------------------------------------------------
 if "interview_state" not in st.session_state:
