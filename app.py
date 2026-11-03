@@ -215,6 +215,14 @@ if "voice_answer" not in st.session_state:
     st.session_state.voice_answer = ""
 
 
+@st.cache_data(show_spinner=False)
+def generate_question_audio(text: str):
+    try:
+        return text_to_speech(text)
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------
 # Stage 1: Setup & Initialization (Before Interview Starts)
 # ---------------------------------------------------------
@@ -297,10 +305,11 @@ elif not st.session_state.interview_state.get("is_complete", False):
     </div>
     """, unsafe_allow_html=True)
 
-    # Audio Player for Voice Questions
+    # Audio Player for Voice Questions (Cached for fast rendering)
     try:
-        audio_file = text_to_speech(current_question)
-        st.audio(audio_file)
+        audio_file = generate_question_audio(current_question)
+        if audio_file and os.path.exists(audio_file):
+            st.audio(audio_file)
     except Exception:
         pass
 
@@ -308,30 +317,45 @@ elif not st.session_state.interview_state.get("is_complete", False):
 
     # Response Section
     st.markdown("#### 🎙️ Your Response")
-    st.caption("Record your spoken answer using the microphone below or type your technical response:")
+    st.caption("Record your spoken answer using the microphone below, upload an audio clip, or type your technical response:")
 
     answer_key = f"answer_input_round_{current_round}"
     if answer_key not in st.session_state:
         st.session_state[answer_key] = st.session_state.get("voice_answer", "")
 
     audio_bytes = None
-    if hasattr(st, "audio_input"):
-        recorded_audio = st.audio_input(
-            "Speak your answer (Click to record):",
-            key=f"audio_input_round_{current_round}"
-        )
-        if recorded_audio is not None:
-            audio_bytes = recorded_audio.getvalue()
-    else:
-        col_mic, _ = st.columns([1, 2])
-        with col_mic:
-            audio_res = mic_recorder(
-                start_prompt="🎤 Start Recording Answer",
-                stop_prompt="⏹ Stop & Transcribe",
-                key=f"recorder_round_{current_round}"
+
+    tab_mic, tab_upload = st.tabs(["🎙️ Microphone Recording", "📁 Upload Audio Recording"])
+
+    with tab_mic:
+        if hasattr(st, "audio_input"):
+            recorded_audio = st.audio_input(
+                "Speak your answer (Click the mic icon to start/stop):",
+                key=f"audio_input_round_{current_round}"
             )
-            if audio_res:
-                audio_bytes = audio_res.get("bytes")
+            if recorded_audio is not None:
+                audio_bytes = recorded_audio.getvalue()
+        else:
+            col_mic, _ = st.columns([1, 2])
+            with col_mic:
+                audio_res = mic_recorder(
+                    start_prompt="🎤 Start Recording Answer",
+                    stop_prompt="⏹ Stop & Transcribe",
+                    key=f"recorder_round_{current_round}"
+                )
+                if audio_res:
+                    audio_bytes = audio_res.get("bytes")
+
+        st.caption("💡 *If clicking the microphone icon does not begin recording, check the 🔒 lock icon in your browser address bar and ensure **Microphone** is toggled to **Allow**.*")
+
+    with tab_upload:
+        uploaded_audio = st.file_uploader(
+            "Upload recorded answer (WAV, MP3, M4A, WEBM, OGG)",
+            type=["wav", "mp3", "m4a", "webm", "ogg"],
+            key=f"audio_upload_round_{current_round}"
+        )
+        if uploaded_audio is not None:
+            audio_bytes = uploaded_audio.getvalue()
 
     if audio_bytes:
         audio_hash = hash(audio_bytes)

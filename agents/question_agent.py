@@ -2,9 +2,6 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from agents.utils import strip_thinking, get_model_name, get_groq_llm
-
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_chroma import Chroma
 from langchain_core.prompts import PromptTemplate
 
 load_dotenv()
@@ -18,6 +15,8 @@ _retriever = None
 def get_retriever():
     global _retriever
     if _retriever is None:
+        from langchain_huggingface import HuggingFaceEmbeddings
+        from langchain_chroma import Chroma
         embeddings = HuggingFaceEmbeddings(
             model_name="BAAI/bge-small-en-v1.5"
         )
