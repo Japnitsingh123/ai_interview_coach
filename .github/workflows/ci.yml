@@ -41,6 +41,7 @@ jobs:
     - name: Verify module imports and LangGraph graph compilation
       env:
         GROQ_API_KEY: "test_groq_api_key"
+        GROQ_MODEL: "qwen/qwen3.8-27b"
       run: |
         python -c "import app, ingest, graph, tts, stt; print('✓ Core modules loaded successfully')"
         python -c "from graph import graph; print('✓ LangGraph graph compiled successfully')"
@@ -48,5 +49,6 @@ jobs:
     - name: Run automated tests
       env:
         GROQ_API_KEY: "test_groq_api_key"
+        GROQ_MODEL: "qwen/qwen3.8-27b"
       run: |
         pytest -v

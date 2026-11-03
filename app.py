@@ -151,8 +151,12 @@ st.markdown("""
 # Tracing Configuration
 # ---------------------------------------------------------
 ls_api_key = os.getenv("LANGCHAIN_API_KEY")
-if not ls_api_key and hasattr(st, "secrets") and "LANGCHAIN_API_KEY" in st.secrets:
-    ls_api_key = st.secrets["LANGCHAIN_API_KEY"]
+if not ls_api_key:
+    try:
+        if hasattr(st, "secrets") and "LANGCHAIN_API_KEY" in st.secrets:
+            ls_api_key = st.secrets["LANGCHAIN_API_KEY"]
+    except Exception:
+        pass
 
 if ls_api_key and len(ls_api_key.strip()) > 5:
     os.environ["LANGCHAIN_TRACING_V2"] = "true"

@@ -11,8 +11,12 @@ def get_model_name():
     Defaults to 'qwen/qwen3.8-27b'.
     """
     model = os.getenv("GROQ_MODEL")
-    if not model and hasattr(st, "secrets") and "GROQ_MODEL" in st.secrets:
-        model = st.secrets["GROQ_MODEL"]
+    if not model:
+        try:
+            if hasattr(st, "secrets") and "GROQ_MODEL" in st.secrets:
+                model = st.secrets["GROQ_MODEL"]
+        except Exception:
+            pass
 
     if not model:
         return DEFAULT_MODEL

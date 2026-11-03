@@ -9,8 +9,12 @@ load_dotenv()
 
 # Support both .env and Streamlit secrets
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY and hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
-    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+if not GROQ_API_KEY:
+    try:
+        if hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
+            GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    except Exception:
+        pass
 
 MODEL_NAME = get_model_name()
 
