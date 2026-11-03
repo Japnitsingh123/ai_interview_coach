@@ -308,34 +308,54 @@ elif not st.session_state.interview_state.get("is_complete", False):
 
     # Response Section
     st.markdown("#### 🎙️ Your Response")
-    st.caption("Answer through voice recording or type your technical response below:")
+    st.caption("Record your spoken answer using the microphone below or type your technical response:")
 
-    col_mic, col_status = st.columns([1, 2])
-    with col_mic:
-        audio = mic_recorder(
-            start_prompt="🎤 Start Recording Answer",
-            stop_prompt="⏹ Stop & Transcribe",
-            key=f"recorder_round_{current_round}"
+    answer_key = f"answer_input_round_{current_round}"
+    if answer_key not in st.session_state:
+        st.session_state[answer_key] = st.session_state.get("voice_answer", "")
+
+    audio_bytes = None
+    if hasattr(st, "audio_input"):
+        recorded_audio = st.audio_input(
+            "Speak your answer (Click to record):",
+            key=f"audio_input_round_{current_round}"
         )
+        if recorded_audio is not None:
+            audio_bytes = recorded_audio.getvalue()
+    else:
+        col_mic, _ = st.columns([1, 2])
+        with col_mic:
+            audio_res = mic_recorder(
+                start_prompt="🎤 Start Recording Answer",
+                stop_prompt="⏹ Stop & Transcribe",
+                key=f"recorder_round_{current_round}"
+            )
+            if audio_res:
+                audio_bytes = audio_res.get("bytes")
 
-    if audio:
-        with open("answer.webm", "wb") as f:
-            f.write(audio["bytes"])
+    if audio_bytes:
+        audio_hash = hash(audio_bytes)
+        last_hash_key = f"_last_audio_hash_round_{current_round}"
+        if st.session_state.get(last_hash_key) != audio_hash:
+            with open("answer.webm", "wb") as f:
+                f.write(audio_bytes)
 
-        try:
-            with st.spinner("Transcribing speech with Faster-Whisper..."):
-                text = speech_to_text("answer.webm")
-            st.session_state.voice_answer = text
-            st.success("✅ Voice transcribed successfully!")
-        except Exception as e:
-            st.error(f"Transcription error: {e}")
+            try:
+                with st.spinner("🤖 Transcribing speech with Faster-Whisper..."):
+                    text = speech_to_text("answer.webm")
+                st.session_state[last_hash_key] = audio_hash
+                if text and text.strip():
+                    st.session_state.voice_answer = text.strip()
+                    st.session_state[answer_key] = text.strip()
+                    st.success("✅ Voice transcribed successfully!")
+            except Exception as e:
+                st.error(f"Transcription error: {e}")
 
     answer = st.text_area(
         "Candidate Answer Text",
-        value=st.session_state.voice_answer,
         height=180,
         placeholder="Structure your answer with technical details, architecture decisions, and metrics...",
-        key=f"answer_input_round_{current_round}"
+        key=answer_key
     )
 
     # Action Buttons
